@@ -46,6 +46,7 @@ export const DashboardView: React.FC = () => {
     setActiveTab,
     setViewingDocument,
     setActiveEquipmentDetailId,
+    reliabilityMetrics,
   } = useApp();
 
   const today = getTodayIso();
@@ -209,10 +210,105 @@ export const DashboardView: React.FC = () => {
         </div>
       </div>
 
-      {/* Grid com os 9 Indicadores HUD Gerenciais */}
+      {/* Selo de Confiabilidade da Base (Porta de Qualidade LSA V1.0 - Seção 12) */}
+      <div
+        className="card"
+        style={{
+          marginBottom: '20px',
+          padding: '16px 20px',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid var(--primary-border)',
+          borderRadius: 'var(--radius-md)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '16px',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div
+            style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '50%',
+              backgroundColor: reliabilityMetrics.overallScore >= 90 ? '#DCFCE7' : '#FEF3C7',
+              color: reliabilityMetrics.overallScore >= 90 ? '#166534' : '#B45309',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <ShieldAlert size={24} color={reliabilityMetrics.overallScore >= 90 ? '#16A34A' : '#D97706'} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                Porta de Qualidade LSA & Confiabilidade da Base
+              </h3>
+              <span
+                style={{
+                  backgroundColor: reliabilityMetrics.overallScore >= 90 ? '#DCFCE7' : '#FEF3C7',
+                  color: reliabilityMetrics.overallScore >= 90 ? '#166534' : '#92400E',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                }}
+              >
+                {reliabilityMetrics.overallScore}% CONFIÁVEL
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
+              Princípio P-05: PDF é evidência; fatos estruturados e validados alimentam indicadores oficiais com rastreabilidade total.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '10px', fontSize: '12px' }}>
+            <div style={{ textAlign: 'center', padding: '6px 10px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-subtle)', fontWeight: 700 }}>VALIDAÇÃO</div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#166534' }}>{reliabilityMetrics.validatedPercentage}%</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '6px 10px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-subtle)', fontWeight: 700 }}>RATEIO</div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#166534' }}>{reliabilityMetrics.allocatedPercentage}%</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '6px 10px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-subtle)', fontWeight: 700 }}>CONCILIADO</div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#166534' }}>{reliabilityMetrics.reconciledPercentage}%</div>
+            </div>
+            <div style={{ textAlign: 'center', padding: '6px 10px', backgroundColor: '#F8FAFC', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+              <div style={{ fontSize: '10px', color: 'var(--text-subtle)', fontWeight: 700 }}>VINCULADO</div>
+              <div style={{ fontSize: '13px', fontWeight: 800, color: '#166534' }}>{reliabilityMetrics.linkedPercentage}%</div>
+            </div>
+          </div>
+
+          {reliabilityMetrics.criticalIssuesCount > 0 && (
+            <button
+              className="btn btn-secondary btn-sm"
+              style={{ borderColor: '#F59E0B', color: '#B45309', fontWeight: 700 }}
+              onClick={() => setActiveTab('inbox')}
+            >
+              <span>Tratar na Entrada ({reliabilityMetrics.criticalIssuesCount})</span>
+              <ChevronRight size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Grid com os 9 Indicadores HUD Gerenciais (com Drill-Down UX) */}
       <div className="kpi-grid">
         {/* 1. Saldo Disponível */}
-        <div className="kpi-card highlight">
+        <div
+          className="kpi-card highlight"
+          onClick={() => setActiveTab('financial')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir o módulo Financeiro"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Saldo Disponível</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--primary)' }}>
@@ -220,11 +316,16 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
           <div className="kpi-value">{formatCurrency(metrics.availableBalanceCents)}</div>
-          <div className="kpi-footer">Saldo inicial + entradas - saídas realizadas</div>
+          <div className="kpi-footer">Saldo inicial + entradas - saídas realizadas ↗</div>
         </div>
 
         {/* 2. Resultado de Caixa do Período */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('financial')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir o módulo Financeiro"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Resultado de Caixa</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: '#DCFCE7', color: '#166534' }}>
@@ -237,11 +338,16 @@ export const DashboardView: React.FC = () => {
           >
             {formatCurrency(metrics.cashResultCents)}
           </div>
-          <div className="kpi-footer">Receitas recebidas menos despesas pagas</div>
+          <div className="kpi-footer">Receitas recebidas menos despesas pagas ↗</div>
         </div>
 
         {/* 3. Receitas Recebidas */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('financial')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir Contas a Receber"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Receitas Recebidas</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: '#DCFCE7', color: '#16A34A' }}>
@@ -251,11 +357,16 @@ export const DashboardView: React.FC = () => {
           <div className="kpi-value" style={{ color: '#16A34A' }}>
             {formatCurrency(metrics.receivedIncomeCents)}
           </div>
-          <div className="kpi-footer">Entradas financeiras liquidadas</div>
+          <div className="kpi-footer">Entradas financeiras liquidadas ↗</div>
         </div>
 
         {/* 4. Despesas Pagas */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('financial')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir Contas a Pagar"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Despesas Pagas</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}>
@@ -265,11 +376,16 @@ export const DashboardView: React.FC = () => {
           <div className="kpi-value" style={{ color: 'var(--text-main)' }}>
             {formatCurrency(metrics.paidExpenseCents)}
           </div>
-          <div className="kpi-footer">Saídas quitadas no período selecionado</div>
+          <div className="kpi-footer">Saídas quitadas no período selecionado ↗</div>
         </div>
 
         {/* 5. Total Contas a Pagar (Abertas) */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('financial')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para ver Contas a Pagar em aberto"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Contas a Pagar</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: '#FEF3C7', color: '#D97706' }}>
@@ -279,11 +395,16 @@ export const DashboardView: React.FC = () => {
           <div className="kpi-value" style={{ color: '#D97706' }}>
             {formatCurrency(metrics.totalPayableOpenCents)}
           </div>
-          <div className="kpi-footer">Previsão de despesas pendentes</div>
+          <div className="kpi-footer">Previsão de despesas pendentes ↗</div>
         </div>
 
         {/* 6. Total Contas a Receber (Abertas) */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('financial')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para ver Contas a Receber"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Contas a Receber</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: '#EFF6FF', color: '#2563EB' }}>
@@ -293,11 +414,16 @@ export const DashboardView: React.FC = () => {
           <div className="kpi-value" style={{ color: '#2563EB' }}>
             {formatCurrency(metrics.totalReceivableOpenCents)}
           </div>
-          <div className="kpi-footer">Previsão de entradas futuras</div>
+          <div className="kpi-footer">Previsão de entradas futuras ↗</div>
         </div>
 
         {/* 7. Valor de Contas Atrasadas */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('deadlines')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir a Central de Vencimentos"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Contas em Atraso</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: '#FEE2E2', color: '#DC2626' }}>
@@ -308,12 +434,17 @@ export const DashboardView: React.FC = () => {
             {formatCurrency(metrics.overduePayableCents)}
           </div>
           <div className="kpi-footer">
-            {metrics.overduePayableCount} conta(s) com vencimento expirado
+            {metrics.overduePayableCount} conta(s) com vencimento expirado ↗
           </div>
         </div>
 
         {/* 8. Total Documentos Ativos */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('documents')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir a Central de Documentos"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Documentos Ativos</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--primary)' }}>
@@ -321,11 +452,16 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
           <div className="kpi-value">{metrics.totalActiveDocs}</div>
-          <div className="kpi-footer">Notas, contratos e certidões</div>
+          <div className="kpi-footer">Notas, contratos e certidões ↗</div>
         </div>
 
         {/* 9. Documentos Adicionados no Período */}
-        <div className="kpi-card">
+        <div
+          className="kpi-card"
+          onClick={() => setActiveTab('inbox')}
+          style={{ cursor: 'pointer' }}
+          title="Clique para abrir a Caixa de Entrada"
+        >
           <div className="kpi-header">
             <span className="kpi-label">Inclusões no Período</span>
             <div className="kpi-icon-wrap" style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--primary)' }}>
@@ -333,7 +469,7 @@ export const DashboardView: React.FC = () => {
             </div>
           </div>
           <div className="kpi-value">{metrics.docsAddedInPeriod}</div>
-          <div className="kpi-footer">Documentos cadastrados na janela</div>
+          <div className="kpi-footer">Documentos cadastrados na janela ↗</div>
         </div>
       </div>
 

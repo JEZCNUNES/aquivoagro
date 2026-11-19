@@ -300,3 +300,199 @@ export function calculateEquipmentSpending(
     totalCents: acquisitionCents + maintenanceCents + fuelCents + otherCents,
   };
 }
+
+
+// =========================================================================
+// LSA ERP RURAL V1.0 — ARQUITETURA DE INDICADORES E CONFIABILIDADE (PORTA DE QUALIDADE)
+// =========================================================================
+import {
+  BaseReliabilityMetrics,
+  ContractRecord,
+  InsuranceRecord,
+} from '../types';
+
+export function calculateBaseReliabilityMetrics(
+  documents: DocumentRecord[],
+  transactions: FinancialTransaction[]
+): BaseReliabilityMetrics {
+  const totalDocs = documents.length || 1;
+  const totalTx = transactions.length || 1;
+
+  // Documentos com status validado ou publicado
+  const validatedDocsCount = documents.filter(
+    (d) => d.validationStatus === 'validated' || d.validationStatus === 'published' || d.status === 'organized'
+  ).length;
+
+  // Documentos sem classificação
+  const unclassifiedCount = documents.filter(
+    (d) => d.status === 'pending' || d.category === 'Outros' || d.validationStatus === 'draft'
+  ).length;
+
+  // Documentos sem vínculo com propriedade, máquina ou parte
+  const unlinkedCount = documents.filter(
+    (d) => !d.propertyId && !d.primaryContext?.id && (!d.links || d.links.length === 0)
+  ).length;
+
+  // Suspeitas de duplicidade
+  const duplicateCount = documents.filter((d) => d.isDuplicateSuspect).length;
+
+  // Rateios completos (100% das dimensões atribuídas)
+  const incompleteAllocations = transactions.filter(
+    (tx) => tx.isAllocationComplete === false
+  );
+  const incompleteAllocationsCount = incompleteAllocations.length;
+
+  // Reconciliação bancária
+  const reconciledTxCount = transactions.filter(
+    (tx) => tx.status === 'paid' && tx.isReconciled !== false
+  ).length;
+  const paidTxCount = transactions.filter((tx) => tx.status === 'paid').length || 1;
+
+  const validatedPercentage = Math.round((validatedDocsCount / totalDocs) * 100);
+  const allocatedPercentage = Math.max(
+    0,
+    Math.round(((totalTx - incompleteAllocationsCount) / totalTx) * 100)
+  );
+  const reconciledPercentage = Math.round((reconciledTxCount / paidTxCount) * 100);
+  const linkedPercentage = Math.max(0, Math.round(((totalDocs - unlinkedCount) / totalDocs) * 100));
+
+  const overallScore = Math.round(
+    validatedPercentage * 0.3 +
+      allocatedPercentage * 0.3 +
+      reconciledPercentage * 0.2 +
+      linkedPercentage * 0.2
+  );
+
+  const criticalIssuesCount = unclassifiedCount + unlinkedCount + duplicateCount + incompleteAllocationsCount;
+
+  return {
+    validatedPercentage,
+    allocatedPercentage,
+    reconciledPercentage,
+    linkedPercentage,
+    overallScore,
+    criticalIssuesCount,
+    unclassifiedCount,
+    unlinkedCount,
+    duplicateCount,
+    incompleteAllocationsCount,
+  };
+}
+
+export interface DeadlineItem {
+  id: string;
+  title: string;
+  type: 'contract' | 'insurance' | 'document' | 'payable' | 'receivable';
+  categoryLabel: string;
+  dueDate: string;
+  daysRemaining: number;
+  amountCents?: number;
+  entityName?: string;
+  status: 'critical' | 'warning' | 'normal';
+}
+
+export function calculateDeadlinesBreakdown(
+  documents: DocumentRecord[],
+  contracts: ContractRecord[],
+  insurance: InsuranceRecord[],
+  transactions: FinancialTransaction[]
+): {
+  items7Days: DeadlineItem[];
+  items30Days: DeadlineItem[];
+  items60Days: DeadlineItem[];
+  items90Days: DeadlineItem[];
+  allUpcoming: DeadlineItem[];
+} {
+  const today = getTodayIso();
+  const items: DeadlineItem[] = [];
+
+  // 1. Contratos próximos do vencimento
+  contracts.forEach((ctr) => {
+    if (ctr.status !== 'cancelled' && ctr.status !== 'expired' && ctr.endDate) {
+      const days = getDaysDiff(today, ctr.endDate);
+      if (days >= -10 && days <= 90) {
+        items.push({
+          id: `ctr-${ctr.id}`,
+          title: ctr.title,
+          type: 'contract',
+          categoryLabel: `Contrato de ${ctr.contractType.toUpperCase()}`,
+          dueDate: ctr.endDate,
+          daysRemaining: days,
+          amountCents: ctr.amountCents,
+          entityName: ctr.primaryContext?.name,
+          status: days <= 7 ? 'critical' : days <= 30 ? 'warning' : 'normal',
+        });
+      }
+    }
+  });
+
+  // 2. Apólices de seguro
+  insurance.forEach((ins) => {
+    if (ins.endDate) {
+      const days = getDaysDiff(today, ins.endDate);
+      if (days >= -10 && days <= 90) {
+        items.push({
+          id: `ins-${ins.id}`,
+          title: `Apólice ${ins.policyNumber} — ${ins.insurerName}`,
+          type: 'insurance',
+          categoryLabel: 'Seguro Rural / Patrimonial',
+          dueDate: ins.endDate,
+          daysRemaining: days,
+          amountCents: ins.premiumCents,
+          entityName: ins.linkedPropertyName || ins.linkedAssetName,
+          status: days <= 7 ? 'critical' : days <= 30 ? 'warning' : 'normal',
+        });
+      }
+    }
+  });
+
+  // 3. Documentos com validade (CAR, Alvarás, Matrículas, etc.)
+  documents.forEach((doc) => {
+    if (doc.expirationDate && doc.status !== 'archived') {
+      const days = getDaysDiff(today, doc.expirationDate);
+      if (days >= -10 && days <= 90) {
+        items.push({
+          id: `doc-${doc.id}`,
+          title: doc.title,
+          type: 'document',
+          categoryLabel: doc.category,
+          dueDate: doc.expirationDate,
+          daysRemaining: days,
+          amountCents: doc.valueCents,
+          entityName: doc.primaryContext?.name,
+          status: days <= 7 ? 'critical' : days <= 30 ? 'warning' : 'normal',
+        });
+      }
+    }
+  });
+
+  // 4. Obrigações financeiras em aberto
+  transactions.forEach((tx) => {
+    if (tx.status === 'open' && tx.dueDate) {
+      const days = getDaysDiff(today, tx.dueDate);
+      if (days >= -10 && days <= 90) {
+        items.push({
+          id: `tx-${tx.id}`,
+          title: tx.description,
+          type: tx.type === 'expense' ? 'payable' : 'receivable',
+          categoryLabel: tx.type === 'expense' ? 'Conta a Pagar' : 'Conta a Receber',
+          dueDate: tx.dueDate,
+          daysRemaining: days,
+          amountCents: tx.amountCents,
+          status: days <= 7 ? 'critical' : days <= 30 ? 'warning' : 'normal',
+        });
+      }
+    }
+  });
+
+  // Ordena por dias restantes (mais urgentes primeiro)
+  items.sort((a, b) => a.daysRemaining - b.daysRemaining);
+
+  return {
+    items7Days: items.filter((i) => i.daysRemaining <= 7),
+    items30Days: items.filter((i) => i.daysRemaining > 7 && i.daysRemaining <= 30),
+    items60Days: items.filter((i) => i.daysRemaining > 30 && i.daysRemaining <= 60),
+    items90Days: items.filter((i) => i.daysRemaining > 60 && i.daysRemaining <= 90),
+    allUpcoming: items,
+  };
+}

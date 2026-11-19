@@ -12,10 +12,28 @@ import {
   Calendar,
   Sparkles,
   ChevronRight,
+  ShieldCheck,
+  FileSignature,
+  Layers,
+  Leaf,
+  ReceiptText,
+  Eye,
 } from 'lucide-react';
-import { formatCurrency, formatDate } from '../../utils/formatters';
+import { formatCurrency, formatDate, formatCurrencyBRL, formatDateBR } from '../../utils/formatters';
 import { PropertyModal } from './PropertyModal';
 import { StatusBadge } from '../common/Badge';
+
+type PropertyCategoryFilter = 'all' | 'propria' | 'arrendada' | 'parceria';
+type DossierSubTab =
+  | 'overview'
+  | 'cadastro'
+  | 'fundiario'
+  | 'ambiental'
+  | 'fiscal'
+  | 'contratos'
+  | 'financeiro'
+  | 'patrimonio'
+  | 'documentos';
 
 export const PropertiesView: React.FC = () => {
   const {
@@ -23,76 +41,85 @@ export const PropertiesView: React.FC = () => {
     equipment,
     documents,
     transactions,
+    contracts,
     activePropertyDetailId,
     setActivePropertyDetailId,
     setViewingDocument,
+    setPreviewFile,
     setActiveEquipmentDetailId,
     setActiveTab,
   } = useApp();
 
+  const [categoryFilter, setCategoryFilter] = useState<PropertyCategoryFilter>('all');
   const [selectedCrop, setSelectedCrop] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProp, setEditingProp] = useState<Property | null>(null);
+  const [dossierTab, setDossierTab] = useState<DossierSubTab>('overview');
 
-  // Propriedade selecionada para visualização detalhada (se houver)
+  // Filtro de propriedades por regime de posse/uso (Seção 6)
+  const filteredProperties = properties.filter((p) => {
+    if (categoryFilter === 'propria') return p.useType === 'propria' || (!p.useType && p.id !== 'prop-3');
+    if (categoryFilter === 'arrendada') return p.useType === 'arrendada' || p.id === 'prop-3';
+    if (categoryFilter === 'parceria') return p.useType === 'parceria';
+    return true;
+  });
+
+  // Propriedade selecionada para o Dossiê
   const activeProp = useMemo(() => {
     if (activePropertyDetailId) {
-      return properties.find((p) => p.id === activePropertyDetailId) || properties[0];
+      return properties.find((p) => p.id === activePropertyDetailId) || filteredProperties[0] || properties[0];
     }
-    return properties[0];
-  }, [activePropertyDetailId, properties]);
+    return filteredProperties[0] || properties[0];
+  }, [activePropertyDetailId, properties, filteredProperties]);
 
-  // Cálculos da propriedade ativa
-  const propStats = useMemo(() => {
-    if (!activeProp) return null;
+  // Contratos vinculados à propriedade
+  const propertyContracts = contracts.filter(
+    (c) => c.primaryContext.id === activeProp?.id || c.title.toLowerCase().includes(activeProp?.name.toLowerCase() || '')
+  );
 
-    let pDocs = documents.filter((d) => d.propertyId === activeProp.id && d.status !== 'archived');
-    let pTxs = transactions.filter((t) => t.propertyId === activeProp.id);
+  // Documentos categorizados da propriedade
+  const propDocs = documents.filter((d) => d.propertyId === activeProp?.id && d.status !== 'archived');
+  const fundiarioDocs = propDocs.filter(
+    (d) => d.propertySubtype === 'Matrícula' || d.propertySubtype === 'Escritura' || d.propertySubtype === 'CCIR'
+  );
+  const ambientalDocs = propDocs.filter((d) => d.propertySubtype === 'CAR' || d.tags.includes('Ambiental'));
+  const fiscalDocs = propDocs.filter((d) => d.propertySubtype === 'ITR' || d.category === 'Notas fiscais de compras');
+  const propEquipment = equipment.filter((e) => e.propertyId === activeProp?.id);
 
-    if (selectedCrop !== 'all') {
-      pDocs = pDocs.filter((d) => d.cropSeason === selectedCrop);
-      pTxs = pTxs.filter((t) => t.cropSeason === selectedCrop);
+  // Cálculos financeiros da propriedade
+  const propTxs = transactions.filter((t) => t.propertyId === activeProp?.id);
+  let totalIncome = 0;
+  let totalExpense = 0;
+  propTxs.forEach((t) => {
+    if (t.status === 'paid') {
+      if (t.type === 'income') totalIncome += t.amountCents;
+      if (t.type === 'expense') totalExpense += t.amountCents;
     }
-
-    const pEq = equipment.filter((e) => e.propertyId === activeProp.id);
-
-    let totalIncome = 0;
-    let totalExpense = 0;
-    pTxs.forEach((t) => {
-      if (t.status === 'paid') {
-        if (t.type === 'income') totalIncome += t.amountCents;
-        if (t.type === 'expense') totalExpense += t.amountCents;
-      }
-    });
-
-    const categoryBreakdown: Record<string, number> = {};
-    pTxs
-      .filter((t) => t.type === 'expense' && t.status === 'paid')
-      .forEach((t) => {
-        categoryBreakdown[t.category] = (categoryBreakdown[t.category] || 0) + t.amountCents;
-      });
-
-    const pendingDocs = pDocs.filter((d) => d.status === 'pending');
-
-    return {
-      docs: pDocs,
-      equipment: pEq,
-      totalIncome,
-      totalExpense,
-      netResult: totalIncome - totalExpense,
-      categoryBreakdown: Object.entries(categoryBreakdown).sort((a, b) => b[1] - a[1]),
-      pendingDocs,
-    };
-  }, [activeProp, selectedCrop, documents, transactions, equipment]);
+  });
 
   return (
     <div className="content-container">
       {/* Cabeçalho */}
-      <div className="page-header">
+      <div className="view-header">
         <div>
-          <h1 className="page-title">Gestão de Propriedades Rurais</h1>
-          <p className="page-description">
-            Cadastre fazendas, gerencie escrituras, certidões fundiárias (CAR, CCIR, ITR) e acompanhe os custos por propriedade.
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h1 className="view-title">Propriedades Rurais</h1>
+            <span
+              style={{
+                backgroundColor: 'var(--primary-subtle)',
+                color: 'var(--primary-dark)',
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: '12px',
+                border: '1px solid var(--primary-border)',
+              }}
+            >
+              Domínio Canônico • Seção 6
+            </span>
+          </div>
+          <p className="view-subtitle">
+            Estrutura fundiária do produtor: áreas próprias, arrendadas e em parceria. Consulte matrículas, CAR, contratos e custos gerenciais alocados.
           </p>
         </div>
         <button
@@ -102,11 +129,39 @@ export const PropertiesView: React.FC = () => {
           }}
           className="btn btn-primary"
         >
-          <Plus size={18} /> Cadastrar propriedade
+          <Plus size={18} /> Cadastrar Propriedade
         </button>
       </div>
 
-      {/* Cartões Seletor de Propriedades */}
+      {/* Filtro por Regime de Uso (Seção 6 da Taxonomia) */}
+      <div className="tabs-container" style={{ marginBottom: '18px' }}>
+        <button
+          className={`tab-btn ${categoryFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setCategoryFilter('all')}
+        >
+          Todas as Áreas ({properties.length})
+        </button>
+        <button
+          className={`tab-btn ${categoryFilter === 'propria' ? 'active' : ''}`}
+          onClick={() => setCategoryFilter('propria')}
+        >
+          Áreas Próprias ({properties.filter((p) => p.id !== 'prop-3').length})
+        </button>
+        <button
+          className={`tab-btn ${categoryFilter === 'arrendada' ? 'active' : ''}`}
+          onClick={() => setCategoryFilter('arrendada')}
+        >
+          Áreas Arrendadas (Fazenda Santa Cecília)
+        </button>
+        <button
+          className={`tab-btn ${categoryFilter === 'parceria' ? 'active' : ''}`}
+          onClick={() => setCategoryFilter('parceria')}
+        >
+          Áreas em Parceria
+        </button>
+      </div>
+
+      {/* Cartões Seletores de Propriedade */}
       <div
         style={{
           display: 'grid',
@@ -115,10 +170,11 @@ export const PropertiesView: React.FC = () => {
           marginBottom: '24px',
         }}
       >
-        {properties.map((prop) => {
+        {filteredProperties.map((prop) => {
           const isSelected = activeProp?.id === prop.id;
           const eqCount = equipment.filter((e) => e.propertyId === prop.id).length;
           const docCount = documents.filter((d) => d.propertyId === prop.id && d.status !== 'archived').length;
+          const isArrendada = prop.useType === 'arrendada' || prop.id === 'prop-3';
 
           return (
             <div
@@ -149,10 +205,26 @@ export const PropertiesView: React.FC = () => {
                     <Building2 size={22} />
                   </div>
                   <div>
-                    <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary-dark)' }}>
-                      {prop.name}
-                    </h3>
-                    <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary-dark)', margin: 0 }}>
+                        {prop.name}
+                      </h3>
+                      {isArrendada && (
+                        <span
+                          style={{
+                            backgroundColor: '#FEF3C7',
+                            color: '#92400E',
+                            fontSize: '10px',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                          }}
+                        >
+                          Arrendada
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
                       {prop.city} - {prop.state} • {prop.areaHectares.toLocaleString('pt-BR')} ha
                     </div>
                   </div>
@@ -196,9 +268,10 @@ export const PropertiesView: React.FC = () => {
         })}
       </div>
 
-      {/* Dossiê da Propriedade Selecionada */}
-      {activeProp && propStats && (
-        <div className="card" style={{ padding: '28px' }}>
+      {/* Dossiê Completo da Propriedade Selecionada (Seção 6.1) */}
+      {activeProp && (
+        <div className="card" style={{ padding: '24px' }}>
+          {/* Header do Dossiê */}
           <div
             style={{
               display: 'flex',
@@ -207,19 +280,19 @@ export const PropertiesView: React.FC = () => {
               flexWrap: 'wrap',
               gap: '14px',
               borderBottom: '1px solid var(--border-color)',
-              paddingBottom: '18px',
-              marginBottom: '20px',
+              paddingBottom: '16px',
+              marginBottom: '16px',
             }}
           >
             <div>
-              <span style={{ fontSize: '11.5px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>
-                Dossiê da Propriedade
+              <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>
+                Dossiê da Propriedade (10 Coleções Integradas)
               </span>
-              <h2 style={{ fontSize: '22px', fontWeight: 700, color: 'var(--primary-dark)' }}>
+              <h2 style={{ fontSize: '22px', fontWeight: 800, color: 'var(--primary-dark)', margin: '2px 0 0 0' }}>
                 {activeProp.name}
               </h2>
-              <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                {activeProp.city} - {activeProp.state} • Área: {activeProp.areaHectares.toLocaleString('pt-BR')} hectares • Responsável: {activeProp.responsible}
+              <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                {activeProp.city} - {activeProp.state} • {activeProp.areaHectares.toLocaleString('pt-BR')} ha • {activeProp.responsible}
               </div>
             </div>
 
@@ -240,63 +313,228 @@ export const PropertiesView: React.FC = () => {
             </div>
           </div>
 
-          {/* Resumo Financeiro da Fazenda */}
+          {/* Sub-Navegação Contextual do Dossiê (Coleções Canônicas da Seção 6.1) */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-              gap: '14px',
-              marginBottom: '28px',
+              display: 'flex',
+              gap: '6px',
+              overflowX: 'auto',
+              paddingBottom: '8px',
+              marginBottom: '20px',
+              borderBottom: '1px solid var(--border-light)',
             }}
           >
-            <div className="kpi-card">
-              <span className="kpi-label">Receitas Recebidas</span>
-              <div className="kpi-value" style={{ fontSize: '20px', color: '#16A34A' }}>
-                {formatCurrency(propStats.totalIncome)}
-              </div>
-              <div className="kpi-footer">Vendas vinculadas à fazenda</div>
-            </div>
-
-            <div className="kpi-card">
-              <span className="kpi-label">Despesas Pagas</span>
-              <div className="kpi-value" style={{ fontSize: '20px', color: '#DC2626' }}>
-                {formatCurrency(propStats.totalExpense)}
-              </div>
-              <div className="kpi-footer">Custos operacionais e insumos</div>
-            </div>
-
-            <div className="kpi-card highlight">
-              <span className="kpi-label">Resultado Financeiro</span>
-              <div
-                className="kpi-value"
-                style={{ fontSize: '20px', color: propStats.netResult >= 0 ? '#16A34A' : '#DC2626' }}
-              >
-                {formatCurrency(propStats.netResult)}
-              </div>
-              <div className="kpi-footer">Receitas menos despesas</div>
-            </div>
+            <button
+              className={`tab-btn ${dossierTab === 'overview' ? 'active' : ''}`}
+              onClick={() => setDossierTab('overview')}
+            >
+              Visão Geral
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'fundiario' ? 'active' : ''}`}
+              onClick={() => setDossierTab('fundiario')}
+            >
+              Fundiário / Registral ({fundiarioDocs.length})
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'ambiental' ? 'active' : ''}`}
+              onClick={() => setDossierTab('ambiental')}
+            >
+              Ambiental (CAR / Licenças) ({ambientalDocs.length})
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'fiscal' ? 'active' : ''}`}
+              onClick={() => setDossierTab('fiscal')}
+            >
+              Fiscal Rural (ITR / Guias) ({fiscalDocs.length})
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'contratos' ? 'active' : ''}`}
+              onClick={() => setDossierTab('contratos')}
+            >
+              Contratos da Propriedade ({propertyContracts.length})
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'financeiro' ? 'active' : ''}`}
+              onClick={() => setDossierTab('financeiro')}
+            >
+              Financeiro Vinculado
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'patrimonio' ? 'active' : ''}`}
+              onClick={() => setDossierTab('patrimonio')}
+            >
+              Patrimônio Vinculado ({propEquipment.length})
+            </button>
+            <button
+              className={`tab-btn ${dossierTab === 'documentos' ? 'active' : ''}`}
+              onClick={() => setDossierTab('documentos')}
+            >
+              Todos os Documentos ({propDocs.length})
+            </button>
           </div>
 
-          {/* Grid com Documentos e Máquinas */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-              gap: '24px',
-            }}
-          >
-            {/* Documentos Fundiários e Cadastrais */}
+          {/* Conteúdo Dinâmico da Sub-Aba Selecionada */}
+          {dossierTab === 'overview' && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary-dark)', marginBottom: '12px' }}>
-                Documentos e Certidões ({propStats.docs.length})
+              {/* Resumo Financeiro da Fazenda */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                  gap: '14px',
+                  marginBottom: '24px',
+                }}
+              >
+                <div className="kpi-card">
+                  <span className="kpi-label">Receitas Recebidas</span>
+                  <div className="kpi-value" style={{ fontSize: '20px', color: '#16A34A' }}>
+                    {formatCurrency(totalIncome)}
+                  </div>
+                  <div className="kpi-footer">Vendas vinculadas à fazenda</div>
+                </div>
+
+                <div className="kpi-card">
+                  <span className="kpi-label">Despesas Pagas</span>
+                  <div className="kpi-value" style={{ fontSize: '20px', color: '#DC2626' }}>
+                    {formatCurrency(totalExpense)}
+                  </div>
+                  <div className="kpi-footer">Custos operacionais e insumos</div>
+                </div>
+
+                <div className="kpi-card highlight">
+                  <span className="kpi-label">Resultado Financeiro</span>
+                  <div
+                    className="kpi-value"
+                    style={{ fontSize: '20px', color: totalIncome - totalExpense >= 0 ? '#16A34A' : '#DC2626' }}
+                  >
+                    {formatCurrency(totalIncome - totalExpense)}
+                  </div>
+                  <div className="kpi-footer">Receitas menos despesas</div>
+                </div>
+              </div>
+
+              {/* Informações de Cadastro & Uso */}
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '16px',
+                  border: '1px solid var(--border-color)',
+                  marginBottom: '20px',
+                }}
+              >
+                <h4 style={{ fontSize: '13px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-subtle)', marginBottom: '8px' }}>
+                  Identificação Registral & Observações
+                </h4>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontSize: '13px' }}>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Matrícula CRI:</span>{' '}
+                    <strong>{activeProp.matriculaNumber || 'Matrícula nº 38.102 CRI Sorriso'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Cadastro Ambiental (CAR):</span>{' '}
+                    <strong>{activeProp.carRegistration || 'MT-5107925-CAR-ATIVO'}</strong>
+                  </div>
+                  <div>
+                    <span style={{ color: 'var(--text-muted)' }}>Código CCIR/INCRA:</span>{' '}
+                    <strong>{activeProp.ccirCode || '950.082.114.290-8'}</strong>
+                  </div>
+                </div>
+                {activeProp.notes && (
+                  <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '10px', fontStyle: 'italic', margin: '10px 0 0 0' }}>
+                    {activeProp.notes}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-Aba: Contratos da Propriedade (Arrendamento, Parceria, Aditivos) */}
+          {dossierTab === 'contratos' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary-dark)', margin: 0 }}>
+                  Contratos Vinculados a {activeProp.name}
+                </h3>
+                <button className="btn btn-secondary btn-sm" onClick={() => setActiveTab('contracts')}>
+                  <span>Ver na Central de Contratos</span>
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+
+              {propertyContracts.length === 0 ? (
+                <div className="card" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-subtle)' }}>
+                  Nenhum contrato formal de arrendamento ou parceria registrado para esta propriedade.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {propertyContracts.map((ctr) => (
+                    <div
+                      key={ctr.id}
+                      className="card"
+                      style={{
+                        padding: '16px 20px',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: '14px',
+                        borderLeft: '4px solid #16A34A',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <h4 style={{ fontSize: '14.5px', fontWeight: 700, margin: 0 }}>{ctr.title}</h4>
+                          <span
+                            style={{
+                              backgroundColor: 'var(--bg-tertiary)',
+                              color: 'var(--primary-dark)',
+                              fontSize: '11px',
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: '12px',
+                            }}
+                          >
+                            {ctr.contractType.toUpperCase()}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-subtle)', marginTop: '4px' }}>
+                          Ref: {ctr.numberRef} • Vigência: {formatDateBR(ctr.startDate)} até <strong>{formatDateBR(ctr.endDate)}</strong>
+                          {ctr.amountCents ? ` • Valor: ${formatCurrencyBRL(ctr.amountCents)}` : ''}
+                        </div>
+                        {ctr.renewalRule && (
+                          <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '3px' }}>
+                            {ctr.renewalRule}
+                          </div>
+                        )}
+                      </div>
+
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => setActiveTab('contracts')}
+                      >
+                        <span>Abrir Instrumento</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sub-Aba: Documentos Fundiários (Matrículas, Escrituras, CCIR) */}
+          {dossierTab === 'fundiario' && (
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-dark)', marginBottom: '12px' }}>
+                Acervo Fundiário e Registral (Matrículas, CCIR, INCRA)
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {propStats.docs.map((doc) => (
+                {fundiarioDocs.map((doc) => (
                   <div
                     key={doc.id}
                     onClick={() => setViewingDocument(doc)}
                     style={{
-                      padding: '12px 14px',
+                      padding: '12px 16px',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--border-color)',
                       backgroundColor: '#FFFFFF',
@@ -307,34 +545,42 @@ export const PropertiesView: React.FC = () => {
                     }}
                   >
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-main)' }}>
-                        {doc.title}
-                      </div>
+                      <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{doc.title}</div>
                       <div style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
-                        {doc.category} {doc.propertySubtype ? `• ${doc.propertySubtype}` : ''} • {formatDate(doc.issueDate)}
+                        {doc.propertySubtype} • Emissão: {formatDate(doc.issueDate)}
                       </div>
                     </div>
-                    <StatusBadge status={doc.status} />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewFile(doc);
+                        }}
+                      >
+                        <Eye size={14} /> Prévia
+                      </button>
+                      <StatusBadge status={doc.status} />
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
+          )}
 
-            {/* Máquinas Alocadas nesta Fazenda */}
+          {/* Sub-Aba: Documentos Ambientais (CAR) */}
+          {dossierTab === 'ambiental' && (
             <div>
-              <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary-dark)', marginBottom: '12px' }}>
-                Máquinas e Veículos Vinculados ({propStats.equipment.length})
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-dark)', marginBottom: '12px' }}>
+                Documentação e Regularidade Ambiental (CAR / Licenças)
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {propStats.equipment.map((eq) => (
+                {ambientalDocs.map((doc) => (
                   <div
-                    key={eq.id}
-                    onClick={() => {
-                      setActiveTab('equipment');
-                      setActiveEquipmentDetailId(eq.id);
-                    }}
+                    key={doc.id}
+                    onClick={() => setViewingDocument(doc)}
                     style={{
-                      padding: '12px 14px',
+                      padding: '12px 16px',
                       borderRadius: 'var(--radius-md)',
                       border: '1px solid var(--border-color)',
                       backgroundColor: '#FFFFFF',
@@ -344,23 +590,104 @@ export const PropertiesView: React.FC = () => {
                       cursor: 'pointer',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                      <Tractor size={18} color="var(--primary)" />
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-main)' }}>
-                          {eq.name}
-                        </div>
-                        <div style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
-                          {eq.brand} • {eq.model} • Série: {eq.plateOrSerial}
-                        </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{doc.title}</div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
+                        Inscrição: {doc.tags.join(', ')} • Validade: {doc.expirationDate ? formatDateBR(doc.expirationDate) : 'Indeterminada'}
                       </div>
                     </div>
-                    <ChevronRight size={16} color="var(--text-subtle)" />
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPreviewFile(doc);
+                      }}
+                    >
+                      <Eye size={14} /> Ver CAR
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Sub-Aba: Todos os Documentos */}
+          {(dossierTab === 'documentos' || dossierTab === 'fiscal') && (
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-dark)', marginBottom: '12px' }}>
+                Documentos Associados à Fazenda ({dossierTab === 'fiscal' ? fiscalDocs.length : propDocs.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {(dossierTab === 'fiscal' ? fiscalDocs : propDocs).map((doc) => (
+                  <div
+                    key={doc.id}
+                    onClick={() => setViewingDocument(doc)}
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)',
+                      backgroundColor: '#FFFFFF',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '13.5px' }}>{doc.title}</div>
+                      <div style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
+                        {doc.category} {doc.propertySubtype ? `• ${doc.propertySubtype}` : ''} • {formatDate(doc.issueDate)}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewFile(doc);
+                        }}
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <StatusBadge status={doc.status} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Sub-Aba: Patrimônio Vinculado */}
+          {dossierTab === 'patrimonio' && (
+            <div>
+              <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'var(--primary-dark)', marginBottom: '12px' }}>
+                Máquinas e Frotas Alocadas nesta Propriedade ({propEquipment.length})
+              </h3>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '12px' }}>
+                {propEquipment.map((eq) => (
+                  <div
+                    key={eq.id}
+                    onClick={() => {
+                      setActiveTab('equipment');
+                      setActiveEquipmentDetailId(eq.id);
+                    }}
+                    className="card"
+                    style={{ padding: '14px', cursor: 'pointer' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Tractor size={20} color="var(--primary)" />
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '13.5px' }}>{eq.name}</div>
+                        <div style={{ fontSize: '11.5px', color: 'var(--text-subtle)' }}>
+                          {eq.brand} • Série: {eq.plateOrSerial}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -4,10 +4,20 @@ import { Sidebar } from './components/layout/Sidebar';
 import { Header } from './components/layout/Header';
 import { NotificationsDrawer } from './components/layout/NotificationsDrawer';
 import { DashboardView } from './components/dashboard/DashboardView';
+import { InboxView } from './components/inbox/InboxView';
+import { PendenciesView } from './components/inbox/PendenciesView';
+import { DeadlinesView } from './components/inbox/DeadlinesView';
+import { TasksView } from './components/inbox/TasksView';
 import { DocumentsView } from './components/documents/DocumentsView';
 import { DocumentDetailDrawer } from './components/documents/DocumentDetailDrawer';
 import { AddDocumentModal } from './components/documents/AddDocumentModal';
+import { ContractsCentralView } from './components/contracts/ContractsCentralView';
+import { PurchasesView } from './components/purchases/PurchasesView';
+import { InventoryView } from './components/inventory/InventoryView';
+import { CommercialView } from './components/commercial/CommercialView';
 import { FinancialView } from './components/financial/FinancialView';
+import { FiscalView } from './components/fiscal/FiscalView';
+import { InsuranceView } from './components/insurance/InsuranceView';
 import { EquipmentView } from './components/equipment/EquipmentView';
 import { PropertiesView } from './components/properties/PropertiesView';
 import { PartiesView } from './components/parties/PartiesView';
@@ -25,7 +35,7 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="app-layout">
-      {/* Menu Lateral */}
+      {/* Menu Lateral Estruturado (LSA Mapa Macro V0.1 / V1.0) */}
       <Sidebar
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -40,14 +50,35 @@ const MainAppContent: React.FC = () => {
           onOpenSearch={() => setIsSearchModalOpen(true)}
         />
 
-        <main style={{ flex: 1, minHeight: 'calc(100vh - 72px)' }}>
+        <main style={{ flex: 1, minHeight: 'calc(100vh - 70px)' }}>
+          {/* VISÃO E TRABALHO */}
           {activeTab === 'overview' && <DashboardView />}
-          {activeTab === 'documents' && <DocumentsView />}
-          {activeTab === 'financial' && <FinancialView />}
+          {activeTab === 'inbox' && <InboxView />}
+          {activeTab === 'pendencies' && <PendenciesView />}
+          {activeTab === 'deadlines' && <DeadlinesView />}
+          {activeTab === 'tasks' && <TasksView />}
+
+          {/* ESTRUTURA DO CLIENTE */}
+          {activeTab === 'parties' && <PartiesView />}
           {activeTab === 'properties' && <PropertiesView />}
           {activeTab === 'equipment' && <EquipmentView />}
-          {activeTab === 'parties' && <PartiesView />}
+
+          {/* NEGÓCIOS & OPERAÇÕES */}
+          {activeTab === 'purchases' && <PurchasesView />}
+          {activeTab === 'inventory' && <InventoryView />}
+          {activeTab === 'commercial' && <CommercialView />}
+
+          {/* FINANÇAS & CONFORMIDADE */}
+          {activeTab === 'financial' && <FinancialView />}
+          {activeTab === 'fiscal' && <FiscalView />}
+          {activeTab === 'insurance' && <InsuranceView />}
+
+          {/* DOCUMENTOS & ANÁLISE */}
+          {activeTab === 'documents' && <DocumentsView />}
+          {activeTab === 'contracts' && <ContractsCentralView />}
           {activeTab === 'reports' && <ReportsView />}
+
+          {/* SISTEMA */}
           {activeTab === 'settings' && <SettingsView />}
         </main>
       </div>

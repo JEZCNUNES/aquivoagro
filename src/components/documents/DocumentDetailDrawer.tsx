@@ -34,6 +34,7 @@ export const DocumentDetailDrawer: React.FC = () => {
     updateDocument,
     archiveDocument,
     restoreDocument,
+    validateDocument,
     properties,
     equipment,
     parties,
@@ -229,6 +230,138 @@ export const DocumentDetailDrawer: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* Validação do Operador (Porta de Qualidade LSA V1.0 - P-06) */}
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: doc.validationStatus === 'published' ? '#F0FDF4' : '#FEF3C7',
+              border: `1px solid ${doc.validationStatus === 'published' ? '#BBF7D0' : '#FDE68A'}`,
+              marginBottom: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+            }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={16} color={doc.validationStatus === 'published' ? '#16A34A' : '#D97706'} />
+                <span
+                  style={{
+                    fontSize: '12.5px',
+                    fontWeight: 700,
+                    color: doc.validationStatus === 'published' ? '#166534' : '#92400E',
+                  }}
+                >
+                  {doc.validationStatus === 'published'
+                    ? 'Documento Validado e Publicado'
+                    : 'Aguardando Validação Formal do Operador'}
+                </span>
+              </div>
+              <div style={{ fontSize: '11px', color: '#4B5563', marginTop: '3px' }}>
+                {doc.validationStatus === 'published'
+                  ? 'Conferido com sucesso. Os dados alimentam os indicadores oficiais.'
+                  : 'Fatos estruturados ainda em conferência. Rascunhos não afetam KPIs.'}
+              </div>
+            </div>
+
+            {doc.validationStatus !== 'published' && doc.status !== 'organized' && (
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={() => {
+                  validateDocument(doc.id);
+                  setViewingDocument({
+                    ...doc,
+                    status: 'organized',
+                    validationStatus: 'published',
+                  });
+                }}
+              >
+                Validar Agora
+              </button>
+            )}
+          </div>
+
+          {/* Seção 15: Um Documento, Vários Caminhos de Consulta */}
+          <div
+            style={{
+              padding: '14px 16px',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: '#F8FAFC',
+              border: '1px solid var(--border-color)',
+              marginBottom: '20px',
+            }}
+          >
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--primary-dark)', textTransform: 'uppercase', marginBottom: '6px' }}>
+              Um Documento, Vários Caminhos de Acesso (Seção 15)
+            </div>
+            <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginBottom: '10px' }}>
+              O arquivo é único na nuvem; os caminhos de consulta são múltiplos conforme a forma que o usuário pesquisa.
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {linkedProp && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '11.5px', padding: '4px 10px' }}
+                  onClick={() => {
+                    setViewingDocument(null);
+                    setActiveTab('properties');
+                  }}
+                >
+                  🌾 Pela Propriedade ({linkedProp.name})
+                </button>
+              )}
+              {linkedParty && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '11.5px', padding: '4px 10px' }}
+                  onClick={() => {
+                    setViewingDocument(null);
+                    setActiveTab('parties');
+                  }}
+                >
+                  👤 Pela Contraparte ({linkedParty.name})
+                </button>
+              )}
+              {linkedTx && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '11.5px', padding: '4px 10px' }}
+                  onClick={() => {
+                    setViewingDocument(null);
+                    setActiveTab('financial');
+                  }}
+                >
+                  💰 Pelo Financeiro ({linkedTx.type === 'expense' ? 'Conta a Pagar' : 'Recebível'})
+                </button>
+              )}
+              {linkedEq && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  style={{ fontSize: '11.5px', padding: '4px 10px' }}
+                  onClick={() => {
+                    setViewingDocument(null);
+                    setActiveTab('equipment');
+                    setActiveEquipmentDetailId(linkedEq.id);
+                  }}
+                >
+                  🚜 Pelo Patrimônio ({linkedEq.name})
+                </button>
+              )}
+              <button
+                className="btn btn-secondary btn-sm"
+                style={{ fontSize: '11.5px', padding: '4px 10px' }}
+                onClick={() => {
+                  setViewingDocument(null);
+                  setActiveTab('documents');
+                }}
+              >
+                📄 Pela Central de Documentos
+              </button>
+            </div>
+          </div>
 
           {/* Vínculos Principais em Destaque */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>

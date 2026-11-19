@@ -1,11 +1,11 @@
-# 🌾 AgroArquivo — Organização Documental e Controle Financeiro Rural
+# 🌾 LSA AGRO — ERP Rural & Gestão Documental
 
-Plataforma web completa, moderna e responsiva voltada para a gestão de documentos fiscais, controle financeiro de fluxo de caixa e patrimônio mecânico do produtor rural brasileiro.
+Plataforma web completa, moderna e responsiva voltada para a organização documental, controle financeiro de fluxo de caixa, gestão patrimonial e governança da operação rural brasileira.
 
 ![Identidade Visual](https://img.shields.io/badge/Identidade-Verde%20e%20Branco-16A34A?style=for-the-badge)
 ![React](https://img.shields.io/badge/React%2019-TypeScript-14532D?style=for-the-badge)
 ![Moeda](https://img.shields.io/badge/Moeda-BRL%20(R$)-16A34A?style=for-the-badge)
-![Modo](https://img.shields.io/badge/Modo-Demonstra%C3%A7%C3%A3o%20em%20Mem%C3%B3ria-22C55E?style=for-the-badge)
+![Arquitetura](https://img.shields.io/badge/LSA%20ERP-Taxonomia%20V1.0-22C55E?style=for-the-badge)
 
 ---
 
@@ -21,15 +21,16 @@ Plataforma web completa, moderna e responsiva voltada para a gestão de document
    npm run dev
    ```
 
-3. Abra no navegador:
+3. Abra no seu navegador:
    **`http://localhost:5173/`**
 
 ---
 
-## 🎨 Identidade Visual (Verde & Branco)
+## 🎨 Identidade Visual (Verde & Branco Mandatória)
 
+O design foi concebido com base na referência de software agro de alta precisão:
 - **Branco (`#FFFFFF`)**: Fundo principal e miolo de cartões.
-- **Verde-escuro (`#14532D`)**: Menu lateral recolhível, títulos e cabeçalhos.
+- **Verde-escuro (`#14532D`)**: Menu lateral recolhível, tipografia de títulos e cabeçalhos.
 - **Verde vibrante (`#16A34A`)**: Botões de ação primária, ícones ativos e destaques positivos.
 - **Verde bem claro (`#F0FDF4`)**: Fundos auxiliares, tags e linhas selecionadas.
 - **Cinza-escuro (`#1F2937`)**: Textos e tabelas de alta legibilidade.
@@ -37,112 +38,114 @@ Plataforma web completa, moderna e responsiva voltada para a gestão de document
 
 ---
 
-## 🚜 Módulos e Funcionalidades
+## 🏛️ Arquitetura de Navegação & Taxonomia Documental (LSA V0.1 / V1.0)
 
-### 1. Painel Principal (HUD Gerencial)
-- **Filtros**: Período (*Últimos 30 dias, 90 dias, Ano Atual, Histórico Completo*), Propriedade (*Todas as propriedades, Fazenda Santa Luzia, Fazenda Boa Esperança*) e Safra (*Safra 2026/2027, Safra 2025/2026*).
-- **9 Indicadores em Tempo Real**:
-  1. *Saldo Disponível*
-  2. *Resultado de Caixa do Período* (Receitas recebidas - Despesas pagas)
-  3. *Receitas Recebidas*
-  4. *Despesas Pagas*
-  5. *Contas a Pagar* (Em aberto)
-  6. *Contas a Receber* (Em aberto)
-  7. *Contas em Atraso* (Valor e contagem com alerta visual)
-  8. *Documentos Ativos*
-  9. *Inclusões no Período*
-- **Resumo Operacional da Propriedade (Cálculos Automáticos sem IA Simulada)**:
-  - Categoria com maior concentração de despesas.
-  - Total a vencer nos próximos 7 dias.
-  - Documentos sem classificação pendentes.
-  - Máquina com maior gasto em manutenção registrado.
-- **Gráficos em Tons de Verde**:
-  - Comparativo semestral de Receitas vs Despesas realizadas por mês.
-  - Distribuição percentual de despesas por categoria.
-- **Blocos de Alerta**: Documentos recentes, próximas contas a vencer e atalhos rápidos.
+O sistema segue o **Princípio-Mãe da LSA**: *a barra lateral não representa onde o arquivo mora fisicamente, mas sim como o produtor e o operador chegam naturalmente à informação*. O documento lógico é único (**DOC-01 + DOC-02**); os caminhos de acesso são múltiplos através de vínculos relacionais (**DOC-03**).
 
-### 2. Central de Documentos
-- Alternância entre visualização em **Tabela** e em **Cartões (Grid)**.
-- 12 categorias fiscais e patrimoniais rurais (Notas fiscais de compras, vendas, peças, combustíveis, insumos, contratos, certidões fundiárias CAR/CCIR/ITR/Matrícula, etc.).
-- Busca por título, fornecedor, número de nota fiscal e tags.
-- Filtros por categoria, propriedade e status documental (*Organizado, Pendente de Classificação, Arquivado*).
-- Ações em lote (*Marcar como Organizados, Arquivar Selecionados*).
-- **Painel Lateral (Drawer)**:
-  - Metadados completos, número da NF, chave de 44 dígitos, safra e observações.
-  - Vínculos em destaque com a **Propriedade**, com a **Máquina** e com o **Lançamento Financeiro**.
-  - Ações de visualização prévia, download de arquivo da sessão, arquivar e restaurar.
+### 📌 1. Visão e Trabalho (Entrada Operacional)
+- **Visão Geral / Painel do Produtor**:
+  - **Selo de Confiabilidade da Base (Porta de Qualidade LSA)**: Exibe a integridade oficial com `% Validado`, `% Rateio Fechado`, `% Conciliado` e `% Vinculado`.
+  - **9 Indicadores HUD**: Saldo Disponível, Resultado de Caixa, Receitas Recebidas, Despesas Pagas, Contas a Pagar/Receber, Contas Atrasadas, Documentos Ativos e Inclusões.
+  - Drill-down direto de cada indicador para o respectivo módulo.
+- **Caixa de Entrada Operacional**:
+  - Fila transitória de arquivos recebidos por upload, e-mail ou portal.
+  - Abas: *Novos / Não Tratados*, *Aguardando Classificação*, *Aguardando Vínculo*, *Aguardando Validação* e *Possível Duplicidade*.
+  - Ações de 1 clique para validação formal, resolução de duplicidades e vinculação de propriedades/máquinas.
+- **Fila de Pendências**:
+  - Classificadas em *Documentais*, *Cadastrais*, *Contratuais*, *Financeiras (Rateios Incompletos)* e *Administrativas*.
+- **Central de Vencimentos**:
+  - Agenda transversal unificada cobrindo janelas de risco em **7, 30, 60 e 90 dias** para contratos, apólices de seguro, certidões fundiárias e contas a pagar/receber.
+- **Agenda / Tarefas**:
+  - Gestão de rotinas administrativas do backoffice com níveis de prioridade e responsáveis.
 
-### 3. Fluxo de Inclusão de Documentos (Wizard em 7 Etapas)
-1. **Seleção de Arquivos**: Drag and Drop ou seletor de arquivos (PDF, JPG, PNG, XML até 20 MB).
-2. **Conferência**: Alerta de possível duplicidade por nome e tamanho com mensagem amigável.
-3. **Preenchimento dos Dados**: Título, valor em R$, data de emissão, número da NF, chave de acesso, safra e tags.
-4. **Categoria e Propriedade**: Vinculação à fazenda correspondente e classificação fundiária.
-5. **Vínculo Patrimonial**: Associação direta ao trator, colheitadeira ou caminhão.
-6. **Lançamento Financeiro Integrado**: Opção explícita de gerar a conta a pagar ou a receber.
-7. **Confirmação**: Registro na sessão em memória.
+### 👤 2. Estrutura do Cliente
+- **Cliente & Pessoas (Governança ID-01)**:
+  - Cadastro canônico de partes sem duplicação: titular, sócios-participantes, cônjuge, procuradores legais e equipe de campo.
+  - Dossiê 360° da parte com dados cadastrais, certidões com validade, contratos em que participa e documentos correlatos.
+- **Propriedades Rurais**:
+  - Segmentação fundiária por regime de uso: *Áreas Próprias*, *Áreas Arrendadas* (**Fazenda Santa Cecília**), *Áreas em Parceria* e *Inativas*.
+  - Dossiê em 10 coleções: Visão Geral, Cadastro & Localização, Fundiário (Matrículas/Escrituras/CCIR), Ambiental (CAR/Licenças), Fiscal Rural (ITR/Guias), Contratos da Propriedade, Financeiro Vinculado, Patrimônio Alocado e Acervo Completo.
+- **Patrimônio & Infraestrutura**:
+  - Cadastro e dossiê de tratores, colhedoras, pulverizadores, implementos, caminhões, utilitários e infraestrutura (armazéns/silos).
 
-### 4. Controle Financeiro
-- Sub-abas: **Contas a Pagar**, **Contas a Receber** e **Movimentações Realizadas**.
-- Ação **"Marcar como Pago"**: Confirmação da data efetiva da quitação e do método (Pix, Boleto, Transferência, etc.), atualizando imediatamente o saldo disponível.
-- Ação **"Reabrir Lançamento"**.
-- Exportação dos dados filtrados para arquivo **CSV** (delimitador `;` e codificação UTF-8 com BOM).
+### 🛒 3. Negócios & Operações
+- **Compras & Fornecedores**:
+  - Dois caminhos complementares de consulta: por **Contraparte Fornecedora** e por **Categoria Canônica de Compra** (*Defensivos Químicos, Sementes, Nutrição & Fertilidade, Peças, Combustíveis, Serviços, etc.*).
+  - Dossiê de Defensivos Químicos com rastreio de ordens de compra, NFs vinculadas e cumprimento físico (**Entregas na Fazenda vs Saldo Retido no Fornecedor**).
+- **Estoques & Saldos**:
+  - Diferenciação precisa entre **Estoque Físico** (no barracão da fazenda) e **Saldo no Fornecedor / Armazéns Gerais**.
+- **Comercialização da Safra**:
+  - Acompanhamento da venda de grãos (Soja e Milho) com volume negociado em sacas, fixações de preço, entregas físicas no armazém e liquidações financeiras recebidas.
 
-### 5. Veículos e Máquinas (Patrimônio Rural)
-- Cadastro de 6 equipamentos demonstrativos (Tratores John Deere, Colheitadeira Case IH Axial-Flow, Caminhão Volvo FH, Hilux SRV, Pulverizador Jacto Uniport, Plantadeira Stara).
-- **Dossiê Individual de Cada Bem**:
-  - Custos separados: **Aquisição**, **Peças & Manutenção**, **Combustível / Óleo** e **Gasto Total Acumulado**.
-  - Lista de todas as notas fiscais vinculadas ao bem.
-  - Histórico cronológico unificado.
-  - Atalho rápido para cadastrar nova despesa ou nota para aquela máquina.
+### 💰 4. Finanças & Conformidade
+- **Financeiro & Crédito Rural**:
+  - Contas a pagar, contas a receber, conciliação e garantia de **Rateio Gerencial Fechado (100%)** por Propriedade, Safra, Cultura, Centro de Custo e Categoria.
+- **Fiscal & Contábil**:
+  - Central transversal de Notas Fiscais (NF-e de entrada, saída e serviços), Declarações Rurais (ITR, LCDPR), Guias (DARF, Funrural) e Certidões Negativas.
+- **Seguros Rurais & Patrimoniais**:
+  - Apólices de seguro agrícola multirrisco de lavoura e proteção de maquinário com controle de vigência e capitais segurados.
 
-### 6. Fornecedores e Clientes
-- Cadastro de revendas de peças, distribuidoras de diesel, cooperativas e tradings compradoras de grãos.
-- Consulta individual com histórico de notas e lançamentos de cada parceiro.
+### 📁 5. Documentos & Contratos
+- **Central de Documentos**: Acervo transversal completo com busca avançada por metadados combinados.
+- **Central de Contratos Transversal (ADR-03)**:
+  - Consulta unificada de contratos de arrendamento, parceria, fornecimento, venda futura de grãos, CPR/financiamento e seguros sem duplicar registros.
+- **Relatórios & Análise**: Demonstrativos de safra, custos por propriedade e comparativos entre períodos.
 
-### 7. Relatórios
-- 6 demonstrativos analíticos:
-  1. *Fluxo de Caixa Realizado (Entradas e Saídas).*
-  2. *Demonstrativo por Propriedade Rural.*
-  3. *Despesas por Categoria.*
-  4. *Custos por Veículo e Máquina.*
-  5. *Documentos por Categoria.*
-  6. *Contas em Aberto e Atrasadas.*
-- Botão funcional de **Exportação CSV** e layout de **Impressão** otimizado (`window.print()`).
-
-### 8. Configurações & Arquitetura Supabase
-- Restauração completa da base inicial de demonstração em 1 clique.
-- Exibição de perfil e organização demonstrativa.
-- Documentação técnica e script SQL para migração futura ao Supabase (Auth, Storage Privado com URLs assinadas e Row Level Security).
+### ⚙️ 6. Sistema & Governança
+- **Trilha de Auditoria (SYS-01)**: Histórico imutável de alterações (quem fez, data/hora, ação realizada e detalhes).
+- **Taxonomias & Categorias Canônicas**: Vocabulário controlado para evitar dispersão de dados.
+- **Esquema DDL para Supabase**: Estrutura pronta para PostgreSQL com Row Level Security (RLS).
 
 ---
 
-## 📦 Estrutura de Arquivos
+## 🔍 Busca Global Onipresente (Atalho: `Ctrl + K`)
+
+Permite localizar em uma única consulta instantânea:
+- Propriedades (*ex: "Santa Cecília"* ou *"Santa Luzia"*)
+- Contratos (*ex: "Arrendamento"* ou *"ARR-2024"*)
+- Documentos e Notas Fiscais (*ex: "NF 15328"* ou chave de 44 dígitos)
+- Máquinas e Frotas (*ex: "6110M"*, *"Case"* ou *"Volvo"*)
+- Compras e Insumos (*ex: "Agrofértil"* ou *"Fungicida Elatus"*)
+- Pessoas, Sócios e Parceiros
+
+---
+
+## 📦 Estrutura de Diretórios
 
 ```
 GIT PRONTO/
-├── public/                 # Favicon e arquivos estáticos
+├── public/                 # Favicon e arquivos públicos
 ├── src/
-│   ├── components/         # Componentes modulares
-│   │   ├── common/         # Badges, modais e pré-visualizadores
-│   │   ├── dashboard/      # HUD e gráficos gerenciais
-│   │   ├── documents/      # Central de documentos e wizard de inclusão
-│   │   ├── equipment/      # Veículos, máquinas e dossiês
-│   │   ├── financial/      # Contas a pagar, receber e movimentações
-│   │   ├── layout/         # Header, Sidebar e Notificações
-│   │   ├── parties/        # Fornecedores e clientes
-│   │   ├── properties/     # Propriedades e dossiê da fazenda
-│   │   ├── reports/        # Relatórios, exportação CSV e impressão
-│   │   ├── search/         # Busca global instantânea
-│   │   └── settings/       # Configurações e guia Supabase
+│   ├── components/         # Módulos da aplicação
+│   │   ├── commercial/     # Vendas de grãos e fixações
+│   │   ├── common/         # Badges e modais
+│   │   ├── contracts/      # Central transversal de contratos
+│   │   ├── dashboard/      # HUD gerencial e Selo de Confiabilidade
+│   │   ├── documents/      # Central documental e fluxo de upload
+│   │   ├── equipment/      # Patrimônio mecânico e dossiês
+│   │   ├── financial/      # Contas a pagar/receber e rateios
+│   │   ├── fiscal/         # NF-e transversal, ITR e certidões
+│   │   ├── inbox/          # Caixa de entrada, pendências, vencimentos e tarefas
+│   │   ├── insurance/      # Apólices de seguro rural e maquinário
+│   │   ├── inventory/      # Estoque físico vs saldo no fornecedor
+│   │   ├── layout/         # Header com breadcrumb, Sidebar e notificações
+│   │   ├── parties/        # Cliente, sócios, equipe e fornecedores
+│   │   ├── properties/     # Propriedades e dossiê em 10 coleções
+│   │   ├── purchases/      # Compras e insumos agrícolas
+│   │   ├── reports/        # Relatórios e exportação CSV
+│   │   ├── search/         # Busca global onipresente (Ctrl+K)
+│   │   └── settings/       # Auditoria SYS-01, taxonomias e DDL Supabase
 │   ├── context/            # Estado global (AppContext)
-│   ├── data/               # Base de dados demonstrativa inicial
-│   ├── types/              # Definições TypeScript
-│   ├── utils/              # Cálculos matemáticos em centavos e formatadores
-│   ├── App.tsx             # Componente raiz
-│   ├── index.css           # Design System Vanilla CSS (Verde e Branco)
+│   ├── data/               # Bases de dados demonstrativas (seedData e lsaData)
+│   ├── types/              # Definições canônicas TypeScript (V1.0)
+│   ├── utils/              # Indicadores de qualidade, formatadores e cálculos
+│   ├── App.tsx             # Componente raiz com roteamento de abas
+│   ├── index.css           # Design System Verde & Branco
 │   └── main.tsx            # Ponto de entrada React
-├── index.html              # HTML com tipografia e metadados
-├── package.json            # Dependências e scripts
-├── tsconfig.json           # Configurações do TypeScript
-└── vite.config.ts          # Configuração Vite com base relativa
+├── ENVIAR_PARA_O_GITHUB.bat # Script de automação git push para Windows
+├── INICIAR_LOCAL.bat       # Inicialização em 1 clique
+├── index.html              # Template HTML com fontes Outfit e Jakarta Sans
+├── package.json            # Scripts e dependências
+├── tsconfig.json           # Configurações TypeScript
+└── vite.config.ts          # Configuração Vite
 ```

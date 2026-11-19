@@ -1,9 +1,8 @@
-// Contexto principal de estado da aplicação AgroArquivo
+// Contexto principal de estado da aplicação AgroArquivo — LSA ERP Rural V1.0
 import React, {
   createContext,
   useContext,
   useState,
-  useEffect,
   useCallback,
   useMemo,
 } from 'react';
@@ -16,9 +15,20 @@ import {
   NotificationAlert,
   ViewTab,
   PaymentMethod,
+  ContractRecord,
+  PurchaseRecord,
+  InventoryRecord,
+  CommercialRecord,
+  InsuranceRecord,
+  TaskItem,
+  AuditLogEntry,
+  BaseReliabilityMetrics,
+  DocumentLink,
 } from '../types';
 import { getInitialSeedData } from '../data/seedData';
+import { getLsaDomainSeedData } from '../data/lsaData';
 import { getTodayIso, getDaysDiff } from '../utils/formatters';
+import { calculateBaseReliabilityMetrics } from '../utils/calculations';
 
 interface AppContextType {
   // Dados principais em memória
@@ -27,6 +37,13 @@ interface AppContextType {
   parties: EntityParty[];
   documents: DocumentRecord[];
   transactions: FinancialTransaction[];
+  contracts: ContractRecord[];
+  purchases: PurchaseRecord[];
+  inventory: InventoryRecord[];
+  commercial: CommercialRecord[];
+  insurance: InsuranceRecord[];
+  tasks: TaskItem[];
+  auditLogs: AuditLogEntry[];
 
   // Estados de navegação e filtros globais
   activeTab: ViewTab;
@@ -40,7 +57,7 @@ interface AppContextType {
   globalSearchQuery: string;
   setGlobalSearchQuery: (query: string) => void;
 
-  // Modais e painéis laterais
+  // Modais e painéis laterais de detalhes
   isAddDocModalOpen: boolean;
   setIsAddDocModalOpen: (open: boolean) => void;
   openAddDocModalWithDefaults: (equipmentId?: string, propertyId?: string) => void;
@@ -54,11 +71,18 @@ interface AppContextType {
   setActiveEquipmentDetailId: (id: string | null) => void;
   activePropertyDetailId: string | null;
   setActivePropertyDetailId: (id: string | null) => void;
+  activePartyDetailId: string | null;
+  setActivePartyDetailId: (id: string | null) => void;
+  activeContractDetailId: string | null;
+  setActiveContractDetailId: (id: string | null) => void;
+  activePurchaseDetailId: string | null;
+  setActivePurchaseDetailId: (id: string | null) => void;
 
-  // Notificações e alertas
+  // Notificações e Métricas de Confiabilidade
   notifications: NotificationAlert[];
+  reliabilityMetrics: BaseReliabilityMetrics;
 
-  // Ações de mutação
+  // Ações de mutação de Documentos
   addDocument: (
     doc: Omit<DocumentRecord, 'id' | 'createdAt'>,
     createTransaction?: {
@@ -72,15 +96,16 @@ interface AppContextType {
       paymentDate?: string;
     }
   ) => { docId: string; txId?: string };
-
   updateDocument: (id: string, updates: Partial<DocumentRecord>) => void;
+  validateDocument: (id: string) => void;
+  linkDocumentToEntity: (id: string, link: DocumentLink) => void;
+  resolveDuplicateDocument: (id: string, action: 'keep' | 'discard') => void;
   archiveDocument: (id: string) => void;
   restoreDocument: (id: string) => void;
   deleteDocument: (id: string) => void;
 
-  addTransaction: (
-    tx: Omit<FinancialTransaction, 'id'>
-  ) => string;
+  // Ações Financeiras
+  addTransaction: (tx: Omit<FinancialTransaction, 'id'>) => string;
   updateTransaction: (id: string, updates: Partial<FinancialTransaction>) => void;
   markTransactionAsPaid: (
     id: string,
@@ -90,15 +115,27 @@ interface AppContextType {
   reopenTransaction: (id: string) => void;
   deleteTransaction: (id: string) => void;
 
+  // Ações de Mestres e Domínios
   addProperty: (prop: Omit<Property, 'id' | 'createdAt'>) => string;
   updateProperty: (id: string, updates: Partial<Property>) => void;
-
   addEquipment: (eq: Omit<Equipment, 'id'>) => string;
   updateEquipment: (id: string, updates: Partial<Equipment>) => void;
-
   addParty: (party: Omit<EntityParty, 'id'>) => string;
   updateParty: (id: string, updates: Partial<EntityParty>) => void;
 
+  // Contratos & Compras
+  addContract: (contract: Omit<ContractRecord, 'id'>) => string;
+  updateContract: (id: string, updates: Partial<ContractRecord>) => void;
+  addPurchase: (purchase: Omit<PurchaseRecord, 'id'>) => string;
+  updatePurchase: (id: string, updates: Partial<PurchaseRecord>) => void;
+  recordPurchaseDelivery: (purchaseId: string, productId: string, deliveredQty: number) => void;
+
+  // Tarefas e Auditoria
+  addTask: (task: Omit<TaskItem, 'id'>) => string;
+  updateTask: (id: string, updates: Partial<TaskItem>) => void;
+  addAuditLog: (entry: Omit<AuditLogEntry, 'id' | 'timestamp'>) => void;
+
+  // Restauração e Feedback
   resetDemoData: () => void;
   toastMessage: string | null;
   showToast: (msg: string) => void;
@@ -106,43 +143,52 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  // Inicialização com dados fictícios
-  const [seed] = useState(() => getInitialSeedData());
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Inicialização com dados base + dados expandidos do LSA ERP
+  const initialBase = useMemo(() => getInitialSeedData(), []);
+  const initialLsa = useMemo(() => getLsaDomainSeedData(), []);
 
-  const [properties, setProperties] = useState<Property[]>(seed.properties);
-  const [equipment, setEquipment] = useState<Equipment[]>(seed.equipment);
-  const [parties, setParties] = useState<EntityParty[]>(seed.parties);
-  const [documents, setDocuments] = useState<DocumentRecord[]>(seed.documents);
+  const [properties, setProperties] = useState<Property[]>(() => [
+    ...initialBase.properties,
+    ...initialLsa.additionalProperties,
+  ]);
+  const [equipment, setEquipment] = useState<Equipment[]>(() => initialBase.equipment);
+  const [parties, setParties] = useState<EntityParty[]>(() => [
+    ...initialBase.parties,
+    ...initialLsa.additionalParties,
+  ]);
+  const [documents, setDocuments] = useState<DocumentRecord[]>(() => [
+    ...initialLsa.additionalDocuments,
+    ...initialBase.documents,
+  ]);
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(
-    seed.transactions
+    () => initialBase.transactions
   );
+  const [contracts, setContracts] = useState<ContractRecord[]>(() => initialLsa.contracts);
+  const [purchases, setPurchases] = useState<PurchaseRecord[]>(() => initialLsa.purchases);
+  const [inventory, setInventory] = useState<InventoryRecord[]>(() => initialLsa.inventory);
+  const [commercial, setCommercial] = useState<CommercialRecord[]>(() => initialLsa.commercial);
+  const [insurance, setInsurance] = useState<InsuranceRecord[]>(() => initialLsa.insurance);
+  const [tasks, setTasks] = useState<TaskItem[]>(() => initialLsa.tasks);
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => initialLsa.auditLogs);
 
   // Navegação
   const [activeTab, setActiveTab] = useState<ViewTab>('overview');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('all');
-  const [periodFilter, setPeriodFilter] = useState<
-    'all' | '30days' | '90days' | 'year'
-  >('all');
+  const [periodFilter, setPeriodFilter] = useState<'all' | '30days' | '90days' | 'year'>('all');
   const [safraFilter, setSafraFilter] = useState<string>('all');
   const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
 
   // Modais e gavetas
   const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
-  const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] =
-    useState(false);
-  const [viewingDocument, setViewingDocument] = useState<DocumentRecord | null>(
-    null
-  );
+  const [isNotificationsDrawerOpen, setIsNotificationsDrawerOpen] = useState(false);
+  const [viewingDocument, setViewingDocument] = useState<DocumentRecord | null>(null);
   const [previewFile, setPreviewFile] = useState<DocumentRecord | null>(null);
-  const [activeEquipmentDetailId, setActiveEquipmentDetailId] = useState<
-    string | null
-  >(null);
-  const [activePropertyDetailId, setActivePropertyDetailId] = useState<
-    string | null
-  >(null);
+  const [activeEquipmentDetailId, setActiveEquipmentDetailId] = useState<string | null>(null);
+  const [activePropertyDetailId, setActivePropertyDetailId] = useState<string | null>(null);
+  const [activePartyDetailId, setActivePartyDetailId] = useState<string | null>(null);
+  const [activeContractDetailId, setActiveContractDetailId] = useState<string | null>(null);
+  const [activePurchaseDetailId, setActivePurchaseDetailId] = useState<string | null>(null);
 
   // Toast temporário de feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -160,6 +206,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         setSelectedPropertyId(propertyId);
       }
       setIsAddDocModalOpen(true);
+    },
+    []
+  );
+
+  // Registro de Auditoria (SYS-01)
+  const addAuditLog = useCallback(
+    (entry: Omit<AuditLogEntry, 'id' | 'timestamp'>) => {
+      const now = new Date();
+      const timeStr = `${getTodayIso()} ${String(now.getHours()).padStart(2, '0')}:${String(
+        now.getMinutes()
+      ).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+
+      const newLog: AuditLogEntry = {
+        ...entry,
+        id: `log-${Date.now()}`,
+        timestamp: timeStr,
+      };
+      setAuditLogs((prev) => [newLog, ...prev]);
     },
     []
   );
@@ -205,13 +269,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     });
 
-    // 3. Documentos pendentes de classificação
+    // 3. Documentos pendentes de classificação ou validação
     documents.forEach((doc) => {
-      if (doc.status === 'pending') {
+      if (doc.status === 'pending' || doc.validationStatus === 'draft') {
         list.push({
           id: `notif-unclassified-${doc.id}`,
-          title: 'Documento pendente de classificação',
-          description: `O documento "${doc.title}" requer categoria ou metadados.`,
+          title: 'Documento pendente de validação',
+          description: `O documento "${doc.title}" requer conferência ou classificação.`,
           type: 'unclassified',
           targetType: 'document',
           targetId: doc.id,
@@ -219,14 +283,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     });
 
-    // 4. Documentos com validade próxima (próximos 30 dias)
+    // 4. Documentos com validade próxima
     documents.forEach((doc) => {
       if (doc.expirationDate && doc.status !== 'archived') {
         const diff = getDaysDiff(doc.expirationDate, today);
         if (diff >= 0 && diff <= 30) {
           list.push({
             id: `notif-exp-${doc.id}`,
-            title: 'Documento com validade próxima',
+            title: 'Validade próxima',
             description: `"${doc.title}" vence em ${diff} dia(s).`,
             type: 'expiring',
             targetType: 'document',
@@ -240,7 +304,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     return list;
   }, [transactions, documents]);
 
-  // Ação: Adicionar Documento com possível criação de Lançamento Financeiro
+  // Cálculo do Selo de Confiabilidade da Base (Porta de Qualidade LSA V1.0)
+  const reliabilityMetrics = useMemo(() => {
+    return calculateBaseReliabilityMetrics(documents, transactions);
+  }, [documents, transactions]);
+
+  // Ação: Adicionar Documento
   const addDocument = useCallback(
     (
       docData: Omit<DocumentRecord, 'id' | 'createdAt'>,
@@ -282,6 +351,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           costCenter: docData.costCenter,
           equipmentId: docData.equipmentId,
           notes: `Gerado a partir do documento: ${docData.title}`,
+          isAllocationComplete: true,
+          isReconciled: createTransaction.status === 'paid',
         };
         setTransactions((prev) => [newTx, ...prev]);
       }
@@ -291,13 +362,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         id: docId,
         createdAt: today,
         linkedFinancialId: txId,
+        validationStatus: docData.validationStatus || 'published',
+        source: docData.source || 'upload',
       };
 
       setDocuments((prev) => [newDoc, ...prev]);
-      showToast('Documento adicionado à sessão com sucesso!');
+      addAuditLog({
+        actor: 'Operador LSA',
+        action: 'Criação',
+        entityType: 'Documento Lógico',
+        entityId: docId,
+        entityTitle: newDoc.title,
+        details: `Documento recebido via ${newDoc.source} e arquivado no sistema.`,
+      });
+      showToast('Documento registrado com sucesso no acervo!');
       return { docId, txId };
     },
-    [showToast]
+    [showToast, addAuditLog]
   );
 
   const updateDocument = useCallback(
@@ -305,7 +386,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setDocuments((prev) =>
         prev.map((doc) => (doc.id === id ? { ...doc, ...updates } : doc))
       );
-      showToast('Documento atualizado com sucesso!');
+      showToast('Documento atualizado com sucesso.');
+    },
+    [showToast]
+  );
+
+  // Validação Formal do Documento (Porta de Qualidade LSA)
+  const validateDocument = useCallback(
+    (id: string) => {
+      const today = getTodayIso();
+      setDocuments((prev) =>
+        prev.map((doc) => {
+          if (doc.id === id) {
+            return {
+              ...doc,
+              status: 'organized',
+              validationStatus: 'published',
+              isDuplicateSuspect: false,
+              validatedAt: today,
+              validatedBy: 'Operador LSA',
+            };
+          }
+          return doc;
+        })
+      );
+      addAuditLog({
+        actor: 'Operador LSA',
+        action: 'Validação',
+        entityType: 'Documento Lógico',
+        entityId: id,
+        entityTitle: 'Validação Formal de Documento',
+        details: 'Classificação, metadados e vínculos conferidos. Documento publicado para consulta.',
+      });
+      showToast('Documento validado e publicado no acervo oficial!');
+    },
+    [showToast, addAuditLog]
+  );
+
+  // Vincular Documento a Entidade (DOC-03)
+  const linkDocumentToEntity = useCallback(
+    (id: string, link: DocumentLink) => {
+      setDocuments((prev) =>
+        prev.map((doc) => {
+          if (doc.id === id) {
+            const existingLinks = doc.links || [];
+            const updatedLinks = [...existingLinks.filter((l) => l.entityId !== link.entityId), link];
+            return {
+              ...doc,
+              links: updatedLinks,
+              propertyId: link.entityType === 'property' ? link.entityId : doc.propertyId,
+              equipmentId: link.entityType === 'equipment' ? link.entityId : doc.equipmentId,
+            };
+          }
+          return doc;
+        })
+      );
+      addAuditLog({
+        actor: 'Operador LSA',
+        action: 'Vinculação',
+        entityType: 'Documento Lógico',
+        entityId: id,
+        entityTitle: 'Vínculo Relacional',
+        details: `Vínculo estabelecido com ${link.entityType}: ${link.entityName}`,
+      });
+      showToast(`Vínculo associado com sucesso a ${link.entityName}!`);
+    },
+    [showToast, addAuditLog]
+  );
+
+  // Resolução de Duplicidade
+  const resolveDuplicateDocument = useCallback(
+    (id: string, action: 'keep' | 'discard') => {
+      if (action === 'discard') {
+        setDocuments((prev) => prev.filter((d) => d.id !== id));
+        showToast('Documento duplicado removido da Caixa de Entrada.');
+      } else {
+        setDocuments((prev) =>
+          prev.map((d) => (d.id === id ? { ...d, isDuplicateSuspect: false } : d))
+        );
+        showToast('Suspeita de duplicidade desconsiderada. Documento mantido.');
+      }
     },
     [showToast]
   );
@@ -317,7 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
           doc.id === id ? { ...doc, status: 'archived' } : doc
         )
       );
-      showToast('Documento movido para arquivados.');
+      showToast('Documento arquivado.');
     },
     [showToast]
   );
@@ -336,18 +496,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const deleteDocument = useCallback(
     (id: string) => {
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
+      setDocuments((prev) => prev.filter((doc) => doc.id !== id));
       showToast('Documento excluído.');
     },
     [showToast]
   );
 
+  // Transações Financeiras
   const addTransaction = useCallback(
     (tx: Omit<FinancialTransaction, 'id'>) => {
       const id = `tx-${Date.now()}`;
-      const newTx: FinancialTransaction = { ...tx, id };
+      const newTx: FinancialTransaction = {
+        ...tx,
+        id,
+        isAllocationComplete: true,
+        isReconciled: tx.status === 'paid',
+      };
       setTransactions((prev) => [newTx, ...prev]);
-      showToast('Lançamento financeiro registrado com sucesso!');
+      showToast('Lançamento financeiro cadastrado com sucesso!');
       return id;
     },
     [showToast]
@@ -358,51 +524,52 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setTransactions((prev) =>
         prev.map((tx) => (tx.id === id ? { ...tx, ...updates } : tx))
       );
-      showToast('Lançamento atualizado.');
+      showToast('Lançamento financeiro atualizado.');
     },
     [showToast]
   );
 
   const markTransactionAsPaid = useCallback(
-    (
-      id: string,
-      paymentDate?: string,
-      paymentMethod?: PaymentMethod
-    ) => {
+    (id: string, paymentDate?: string, paymentMethod?: PaymentMethod) => {
       const today = getTodayIso();
+      const effDate = paymentDate || today;
       setTransactions((prev) =>
         prev.map((tx) => {
           if (tx.id === id) {
             return {
               ...tx,
               status: 'paid',
-              paymentDate: paymentDate || today,
+              paymentDate: effDate,
               paymentMethod: paymentMethod || tx.paymentMethod || 'Pix',
+              isReconciled: true,
             };
           }
           return tx;
         })
       );
-      showToast('Conta marcada como paga e saldo atualizado!');
+      addAuditLog({
+        actor: 'Operador LSA',
+        action: 'Liquidação',
+        entityType: 'Lançamento Financeiro',
+        entityId: id,
+        entityTitle: 'Liquidação Financeira',
+        details: `Título liquidado em ${effDate} via ${paymentMethod || 'Pix'}.`,
+      });
+      showToast('Lançamento marcado como quitado!');
     },
-    [showToast]
+    [showToast, addAuditLog]
   );
 
   const reopenTransaction = useCallback(
     (id: string) => {
       setTransactions((prev) =>
-        prev.map((tx) => {
-          if (tx.id === id) {
-            return {
-              ...tx,
-              status: 'open',
-              paymentDate: undefined,
-            };
-          }
-          return tx;
-        })
+        prev.map((tx) =>
+          tx.id === id
+            ? { ...tx, status: 'open', paymentDate: undefined, isReconciled: false }
+            : tx
+        )
       );
-      showToast('Lançamento reaberto como pendente.');
+      showToast('Lançamento reaberto.');
     },
     [showToast]
   );
@@ -410,19 +577,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const deleteTransaction = useCallback(
     (id: string) => {
       setTransactions((prev) => prev.filter((tx) => tx.id !== id));
-      showToast('Lançamento financeiro excluído.');
+      showToast('Lançamento excluído.');
     },
     [showToast]
   );
 
+  // Propriedades, Equipamentos e Partes
   const addProperty = useCallback(
     (prop: Omit<Property, 'id' | 'createdAt'>) => {
       const id = `prop-${Date.now()}`;
-      const newProp: Property = {
-        ...prop,
-        id,
-        createdAt: getTodayIso(),
-      };
+      const newProp: Property = { ...prop, id, createdAt: getTodayIso() };
       setProperties((prev) => [...prev, newProp]);
       showToast('Propriedade cadastrada com sucesso!');
       return id;
@@ -445,7 +609,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const id = `eq-${Date.now()}`;
       const newEq: Equipment = { ...eq, id };
       setEquipment((prev) => [...prev, newEq]);
-      showToast('Máquina/Veículo cadastrado com sucesso!');
+      showToast('Equipamento cadastrado com sucesso!');
       return id;
     },
     [showToast]
@@ -466,7 +630,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       const id = `party-${Date.now()}`;
       const newParty: EntityParty = { ...party, id };
       setParties((prev) => [...prev, newParty]);
-      showToast('Fornecedor/Cliente cadastrado com sucesso!');
+      showToast('Pessoa/Fornecedor cadastrado com sucesso!');
       return id;
     },
     [showToast]
@@ -482,18 +646,146 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     [showToast]
   );
 
+  // Contratos
+  const addContract = useCallback(
+    (contract: Omit<ContractRecord, 'id'>) => {
+      const id = `ctr-${Date.now()}`;
+      const newContract: ContractRecord = { ...contract, id };
+      setContracts((prev) => [newContract, ...prev]);
+      addAuditLog({
+        actor: 'Gestor LSA',
+        action: 'Criação',
+        entityType: 'Contrato',
+        entityId: id,
+        entityTitle: newContract.title,
+        details: `Contrato de ${newContract.contractType} cadastrado com vigência até ${newContract.endDate}.`,
+      });
+      showToast('Contrato registrado na Central de Contratos!');
+      return id;
+    },
+    [showToast, addAuditLog]
+  );
+
+  const updateContract = useCallback(
+    (id: string, updates: Partial<ContractRecord>) => {
+      setContracts((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+      );
+      showToast('Contrato atualizado.');
+    },
+    [showToast]
+  );
+
+  // Compras e Entregas
+  const addPurchase = useCallback(
+    (purchase: Omit<PurchaseRecord, 'id'>) => {
+      const id = `pur-${Date.now()}`;
+      const newPur: PurchaseRecord = { ...purchase, id };
+      setPurchases((prev) => [newPur, ...prev]);
+      showToast('Ordem de Compra cadastrada com sucesso!');
+      return id;
+    },
+    [showToast]
+  );
+
+  const updatePurchase = useCallback(
+    (id: string, updates: Partial<PurchaseRecord>) => {
+      setPurchases((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      );
+      showToast('Compra atualizada.');
+    },
+    [showToast]
+  );
+
+  const recordPurchaseDelivery = useCallback(
+    (purchaseId: string, productId: string, deliveredQty: number) => {
+      setPurchases((prev) =>
+        prev.map((pur) => {
+          if (pur.id === purchaseId) {
+            const updatedItems = pur.items.map((item) => {
+              if (item.productId === productId) {
+                const newDelivered = item.deliveredQuantity + deliveredQty;
+                return { ...item, deliveredQuantity: newDelivered };
+              }
+              return item;
+            });
+            const allDelivered = updatedItems.every((i) => i.deliveredQuantity >= i.quantity);
+            return {
+              ...pur,
+              items: updatedItems,
+              status: allDelivered ? 'delivered' : 'partial_delivered',
+            };
+          }
+          return pur;
+        })
+      );
+
+      // Atualiza também o estoque (adiciona ao físico e reduz saldo no fornecedor)
+      setInventory((prev) =>
+        prev.map((inv) => {
+          if (inv.id.includes(productId) || inv.productName.toLowerCase().includes('elatus')) {
+            return {
+              ...inv,
+              physicalStock: inv.physicalStock + deliveredQty,
+              supplierStock: Math.max(0, inv.supplierStock - deliveredQty),
+              lastMovementDate: getTodayIso(),
+            };
+          }
+          return inv;
+        })
+      );
+
+      showToast(`Entrega de ${deliveredQty} registrada! Estoque físico e saldo em fornecedor atualizados.`);
+    },
+    [showToast]
+  );
+
+  // Tarefas
+  const addTask = useCallback(
+    (task: Omit<TaskItem, 'id'>) => {
+      const id = `task-${Date.now()}`;
+      const newTask: TaskItem = { ...task, id };
+      setTasks((prev) => [newTask, ...prev]);
+      showToast('Tarefa administrativa adicionada à agenda!');
+      return id;
+    },
+    [showToast]
+  );
+
+  const updateTask = useCallback(
+    (id: string, updates: Partial<TaskItem>) => {
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+      );
+      showToast('Tarefa atualizada.');
+    },
+    [showToast]
+  );
+
+  // Reset Demo
   const resetDemoData = useCallback(() => {
-    const fresh = getInitialSeedData();
-    setProperties(fresh.properties);
-    setEquipment(fresh.equipment);
-    setParties(fresh.parties);
-    setDocuments(fresh.documents);
-    setTransactions(fresh.transactions);
+    const base = getInitialSeedData();
+    const lsa = getLsaDomainSeedData();
+
+    setProperties([...base.properties, ...lsa.additionalProperties]);
+    setEquipment(base.equipment);
+    setParties([...base.parties, ...lsa.additionalParties]);
+    setDocuments([...lsa.additionalDocuments, ...base.documents]);
+    setTransactions(base.transactions);
+    setContracts(lsa.contracts);
+    setPurchases(lsa.purchases);
+    setInventory(lsa.inventory);
+    setCommercial(lsa.commercial);
+    setInsurance(lsa.insurance);
+    setTasks(lsa.tasks);
+    setAuditLogs(lsa.auditLogs);
+
     setSelectedPropertyId('all');
     setPeriodFilter('all');
     setSafraFilter('all');
     setGlobalSearchQuery('');
-    showToast('Base de demonstração restaurada para os dados iniciais!');
+    showToast('Base LSA ERP Rural restaurada integralmente para o padrão demonstrativo!');
   }, [showToast]);
 
   return (
@@ -504,6 +796,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         parties,
         documents,
         transactions,
+        contracts,
+        purchases,
+        inventory,
+        commercial,
+        insurance,
+        tasks,
+        auditLogs,
         activeTab,
         setActiveTab,
         selectedPropertyId,
@@ -527,9 +826,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         setActiveEquipmentDetailId,
         activePropertyDetailId,
         setActivePropertyDetailId,
+        activePartyDetailId,
+        setActivePartyDetailId,
+        activeContractDetailId,
+        setActiveContractDetailId,
+        activePurchaseDetailId,
+        setActivePurchaseDetailId,
         notifications,
+        reliabilityMetrics,
         addDocument,
         updateDocument,
+        validateDocument,
+        linkDocumentToEntity,
+        resolveDuplicateDocument,
         archiveDocument,
         restoreDocument,
         deleteDocument,
@@ -544,6 +853,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         updateEquipment,
         addParty,
         updateParty,
+        addContract,
+        updateContract,
+        addPurchase,
+        updatePurchase,
+        recordPurchaseDelivery,
+        addTask,
+        updateTask,
+        addAuditLog,
         resetDemoData,
         toastMessage,
         showToast,
