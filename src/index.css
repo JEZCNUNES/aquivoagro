@@ -68,11 +68,12 @@
   --transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Reset Global */
+/* Reset Global & Caixa Alta Mandatória LSA (Todo o site em CAIXA ALTA) */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  text-transform: uppercase;
 }
 
 body {
@@ -83,12 +84,19 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
+  text-transform: uppercase;
 }
 
-button, input, select, textarea {
+button, input, select, textarea, optgroup, option {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
+  text-transform: uppercase;
+}
+
+input::placeholder,
+textarea::placeholder {
+  text-transform: uppercase;
 }
 
 a {
